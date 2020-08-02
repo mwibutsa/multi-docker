@@ -1,0 +1,34 @@
+sudo: required
+services:
+  - docker
+
+before_install:
+  - docker build -t mwibutsa/react-test -f ./client/Dockerfile.dev ./client
+
+script:
+  - docker run -e CI=true mwibutsa/react-test npm run test -- --coverage
+
+after_success:
+  - docker build -t mwibutsa/multi-client ./client
+  - docker build -t mwibutsa/multi-nginx ./nginx
+  - docker build -t mwibutsa/multi-server ./server
+  - docker build -t mwibutsa/multi-worker ./worker
+  # Log into the docker CLI
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+  # Take those images an push them to docker hub
+  - docker push  mwibutsa/multi-client
+  - docker push  mwibutsa/multi-nginx
+  - docker push  mwibutsa/multi-server
+  - docker push  mwibutsa/multi-worker
+
+deploy:
+  provider: elasticbeanstalk
+  region: "us-east-2"
+  app: "multi-docker"
+  env: "MultiDocker-env-1"
+  bucket_name: "elasticbeanstalk-us-east-2-271279667713"
+  bucket_path: "multi-docker"
+  on:
+    branch: master
+  access_key_id: $AWS_ACCESS_KEY
+  secret_access_key: $AWS_SECRET_KEY
